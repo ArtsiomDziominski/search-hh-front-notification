@@ -14,7 +14,7 @@ function vacancySearchText(
     keySkillsString
   ];
 
-  return normalize(parts.join(" "));
+  return normalize(parts.join(" ").toLowerCase());
 }
 
 export function matchesKeywords(
@@ -28,8 +28,8 @@ export function matchesKeywords(
   const excluded = excludedKeywords.map(normalize).filter(Boolean);
 
   const hasRequired =
-    required.length === 0 || required.some((keyword) => text.includes(keyword));
-  const hasExcluded = excluded.some((keyword) => text.includes(keyword));
+    required.length === 0 || required.some((keyword) => text.includes(keyword.toLowerCase()));
+  const hasExcluded = excluded.some((keyword) => text.includes(keyword.toLowerCase()));
   return hasRequired && !hasExcluded;
 }
 

@@ -7,7 +7,6 @@ import {
   addVacancyDetailRecords,
   addSentVacancyRecords,
   getVacancyDetailsPayloadByIds,
-  getVacancyKeySkillsByIds,
   getVacancyIdsWithoutDetails,
   getSentVacancyIds,
   getSubscribers,
@@ -30,24 +29,41 @@ function formatSalary(vacancy: HHVacancy): string {
   return `${from} - ${to} ${currency}`.trim();
 }
 
-function formatVacancyMessage(vacancy: HHVacancy, keySkills: string[] = []): string {
-  const company = vacancy.employer?.name ?? "Компания не указана";
-  const area = vacancy.area?.name ?? "Локация не указана";
-  const requirement = vacancy.snippet?.requirement ?? "";
-  const responsibility = vacancy.snippet?.responsibility ?? "";
-  const publishedAt = vacancy.published_at ?? "";
+function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]+>/g, "");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function sanitizeForTelegramHtml(value: string): string {
+  return escapeHtml(stripHtmlTags(value));
+}
+
+function formatVacancyMessage(vacancy: HHVacancy, detailedVacancy: Record<string, unknown> | null = null): string {
+  const title = sanitizeForTelegramHtml(vacancy.name);
+  const company = sanitizeForTelegramHtml(vacancy.employer?.name ?? "Компания не указана");
+  const area = sanitizeForTelegramHtml(vacancy.area?.name ?? "Локация не указана");
+  const requirement = sanitizeForTelegramHtml(vacancy.snippet?.requirement ?? "");
+  const publishedAt = sanitizeForTelegramHtml(vacancy.published_at ?? "");
+  const salary = sanitizeForTelegramHtml(formatSalary(vacancy));
+  const safeAlternateUrl = sanitizeForTelegramHtml(vacancy.alternate_url);
+  const skills = Array.isArray(detailedVacancy?.key_skills) ? detailedVacancy.key_skills.map((skill: { name: string }) => sanitizeForTelegramHtml(skill?.name || "")).join(" ") : "";
 
   const detailsBlock = [
-    `Название: <b>${vacancy.name}</b>`,
+    `Название: <b>${title}</b>`,
     `Компания: ${company}`,
     `Локация: ${area}`,
-    `Зарплата: <b>${formatSalary(vacancy)}</b>`
+    `Зарплата: <b>${salary}</b>`
   ].join("\n");
 
   const contentBlocks = [
-    requirement ? `Требования:\n${requirement}` : "",
-    responsibility ? `Задачи:\n${responsibility}` : "",
-    keySkills.length > 0 ? `Ключевые навыки:\n<b>${keySkills.join(", ")}</b>` : ""
+    requirement ? `Требования:\n${requirement} \n` : "",
+    skills ? `Cкилы: <b>${skills}</b>` : ''
   ].filter(Boolean);
 
   return [
@@ -57,7 +73,7 @@ function formatVacancyMessage(vacancy: HHVacancy, keySkills: string[] = []): str
     ...(contentBlocks.length > 0 ? ["", ...contentBlocks] : []),
     ...(publishedAt ? ["", `Опубликовано: ${publishedAt}`] : []),
     "",
-    `Подробная информация: ${vacancy.alternate_url}`
+    `Подробная информация: ${safeAlternateUrl}`
   ].join("\n");
 }
 
@@ -142,7 +158,6 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     );
   }
 
-  const keySkillsByVacancyId = await getVacancyKeySkillsByIds(newVacancies.map((vacancy) => vacancy.id));
   const detailsPayloadByVacancyId = await getVacancyDetailsPayloadByIds(
     newVacancies.map((vacancy) => vacancy.id)
   );
@@ -155,7 +170,7 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     )
   );
   devLog(
-    `[runPollingCycle] filtered vacancies (with key skills): matched=${filteredVacancies.length}, requiredKeywords=${settings.requiredKeywords.length}, excludedKeywords=${settings.excludedKeywords.length}`
+    `[runPollingCycle] filtered vacancies: matched=${filteredVacancies.length}, requiredKeywords=${settings.requiredKeywords.length}, excludedKeywords=${settings.excludedKeywords.length}`
   );
   if (filteredVacancies.length === 0) {
     devLog("No new vacancies matched filters.");
@@ -173,7 +188,7 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     devLog(
       `[runPollingCycle] sending ${index + 1}/${filteredVacancies.length}: id=${vacancy.id}, title="${vacancy.name}"`
     );
-    const message = formatVacancyMessage(vacancy, keySkillsByVacancyId.get(vacancy.id) ?? []);
+    const message = formatVacancyMessage(vacancy, detailsPayloadByVacancyId.get(vacancy.id) ?? null);
     await bot.sendToSubscribers(subscribers, message, settings.telegram.messageDelayMs);
   }
 
