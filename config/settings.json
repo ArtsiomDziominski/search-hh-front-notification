@@ -1,0 +1,39 @@
+{
+  "pollIntervalMinutes": 1,
+  "searchQueries": [
+    "Frontend-разработчик",
+    "Frontend developer",
+    "Vue разработчик",
+    "Nuxt разработчик",
+    "JavaScript разработчик",
+    "Middle Frontend разработчик"
+  ],
+  "requiredKeywords": [
+    "frontend",
+    "vue",
+    "nuxt",
+    "javascript",
+    "typescript",
+    "pinia"
+  ],
+  "excludedKeywords": [
+    "1c",
+    "php",
+    "android",
+    "ios"
+  ],
+  "hh": {
+    "perPage": 1,
+    "pages": 1,
+    "onlyWithSalary": false
+  },
+  "telegram": {
+    "messageDelayMs": 300
+  },
+  "import": {
+    "adminChatIds": [
+      1127373465
+    ]
+  },
+  "sentVacancyHistoryLimit": 5000
+}

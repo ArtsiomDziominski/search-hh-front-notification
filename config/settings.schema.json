@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "pollIntervalMinutes",
+    "searchQueries",
+    "requiredKeywords",
+    "excludedKeywords",
+    "hh",
+    "telegram",
+    "import",
+    "sentVacancyHistoryLimit"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "pollIntervalMinutes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "searchQueries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "requiredKeywords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "excludedKeywords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "hh": {
+      "type": "object",
+      "required": ["perPage", "pages", "onlyWithSalary"],
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "type": "string"
+        },
+        "perPage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "pages": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "onlyWithSalary": {
+          "type": "boolean"
+        }
+      }
+    },
+    "telegram": {
+      "type": "object",
+      "required": ["messageDelayMs"],
+      "additionalProperties": false,
+      "properties": {
+        "messageDelayMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "import": {
+      "type": "object",
+      "required": ["adminChatIds"],
+      "additionalProperties": false,
+      "properties": {
+        "adminChatIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "sentVacancyHistoryLimit": {
+      "type": "integer",
+      "minimum": 100
+    }
+  }
+}
