@@ -8,7 +8,6 @@
     "excludedKeywords",
     "hh",
     "telegram",
-    "import",
     "sentVacancyHistoryLimit"
   ],
   "additionalProperties": false,
@@ -70,19 +69,6 @@
         "messageDelayMs": {
           "type": "integer",
           "minimum": 0
-        }
-      }
-    },
-    "import": {
-      "type": "object",
-      "required": ["adminChatIds"],
-      "additionalProperties": false,
-      "properties": {
-        "adminChatIds": {
-          "type": "array",
-          "items": {
-            "type": "integer"
-          }
         }
       }
     },

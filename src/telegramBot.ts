@@ -58,6 +58,7 @@ export class TelegramVacancyBot {
   }
 
   private formatSettingsForUser(settings: AppSettings): string {
+    const adminChatIds = this.getAdminChatIdsFromEnv();
     const area = settings.hh.area ?? "";
     const isAllHhSearch = !settings.hh.area;
     const hhSearchScope = isAllHhSearch
@@ -77,7 +78,7 @@ export class TelegramVacancyBot {
       `Только с зарплатой: <b>${settings.hh.onlyWithSalary ? "да" : "нет"}</b>`,
       `Пауза между сообщениями: <b>${settings.telegram.messageDelayMs} мс</b>`,
       `Лимит истории отправленных вакансий: <b>${settings.sentVacancyHistoryLimit}</b>`,
-      `Админов для импорта: <b>${settings.import.adminChatIds.length}</b>`
+      `Админов для импорта: <b>${adminChatIds.length}</b>`
     ];
 
     return lines.join("\n");
@@ -329,8 +330,17 @@ export class TelegramVacancyBot {
   }
 
   private async canImport(chatId: number): Promise<boolean> {
-    const settings = await this.getSettings();
-    return settings.import.adminChatIds.includes(chatId);
+    return this.getAdminChatIdsFromEnv().includes(chatId);
+  }
+
+  private getAdminChatIdsFromEnv(): number[] {
+    const rawAdminChatIds = process.env.ADMIN_CHAT_IDS ?? "";
+    return rawAdminChatIds
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0)
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value));
   }
 
   async start(): Promise<void> {

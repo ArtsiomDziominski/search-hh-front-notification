@@ -9,10 +9,9 @@ Telegram-бот для поиска вакансий на HH и отправки
 2. Создайте `.env` из примера:
    - скопируйте `.env.example` в `.env`
    - укажите `TELEGRAM_BOT_TOKEN`
+   - укажите `ADMIN_CHAT_IDS` (например `123456789,987654321`)
 3. Настройте параметры в `config/settings.json`.
-4. Добавьте admin chat id для импорта настроек в `config/settings.json`:
-   - `import.adminChatIds: [123456789]`
-5. Запустите бота:
+4. Запустите бота:
    - dev: `npm run dev`
    - prod: `npm run build` и `npm start`
 
@@ -37,4 +36,4 @@ Telegram-бот для поиска вакансий на HH и отправки
 - `excludedKeywords` — ключевые слова для исключения вакансий.
 - `hh` — параметры HH API.
 - `telegram.messageDelayMs` — пауза между отправками.
-- `import.adminChatIds` — chat id, которым разрешен `/import`.
+- `ADMIN_CHAT_IDS` в `.env` — chat id, которым разрешены `/import`, `/export`, `/clear_db` (через запятую).

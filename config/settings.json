@@ -18,7 +18,6 @@
   ],
   "excludedKeywords": [
     "1c",
-    "php",
     "android",
     "ios"
   ],
@@ -29,11 +28,6 @@
   },
   "telegram": {
     "messageDelayMs": 300
-  },
-  "import": {
-    "adminChatIds": [
-      1127373465
-    ]
   },
   "sentVacancyHistoryLimit": 5000
 }

@@ -12,9 +12,6 @@ export interface AppSettings {
   telegram: {
     messageDelayMs: number;
   };
-  import: {
-    adminChatIds: number[];
-  };
   sentVacancyHistoryLimit: number;
 }
 
