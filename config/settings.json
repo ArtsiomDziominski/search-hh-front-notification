@@ -23,7 +23,7 @@
     "ios"
   ],
   "hh": {
-    "perPage": 3,
+    "perPage": 10,
     "pages": 1,
     "onlyWithSalary": false
   },
