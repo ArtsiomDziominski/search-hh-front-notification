@@ -1,5 +1,5 @@
 import axios from "axios";
-import { isDevelopment } from "./constants";
+import { devError, devLog, devWarn } from "./devLogger";
 import { AppSettings, HHVacancy } from "./types";
 
 interface HHListResponse {
@@ -17,7 +17,7 @@ const hhApi = axios.create({
 export async function fetchVacanciesByQueries(settings: AppSettings): Promise<HHVacancy[]> {
   const unique = new Map<string, HHVacancy>();
 
-  console.log(`[fetchVacanciesByQueries`, settings);
+  devLog(`[fetchVacanciesByQueries`, settings);
 
   for (const query of settings.searchQueries) {
     for (let page = 0; page < settings.hh.pages; page += 1) {
@@ -32,7 +32,7 @@ export async function fetchVacanciesByQueries(settings: AppSettings): Promise<HH
       const startedAt = Date.now();
 
 
-      if (isDevelopment) console.log(`[HH API] -> GET /vacancies`, params);
+      devLog(`[HH API] -> GET /vacancies`, params);
 
       let response;
       try {
@@ -40,21 +40,16 @@ export async function fetchVacanciesByQueries(settings: AppSettings): Promise<HH
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown request error";
         const durationMs = Date.now() - startedAt;
-        console.log(`[HH API] <- ERROR GET /vacancies (${durationMs}ms): ${message}`, params);
-
-        if (isDevelopment) {
-          console.error(`[HH API] <- ERROR GET /vacancies (${durationMs}ms): ${message}`, params);
-        }
+        devWarn(`[HH API] <- ERROR GET /vacancies (${durationMs}ms): ${message}`, params);
+        devError(`[HH API] <- ERROR GET /vacancies (${durationMs}ms): ${message}`, params);
         throw error;
       }
 
-      if (isDevelopment) {
-        const durationMs = Date.now() - startedAt;
-        const itemsCount = response.data.items?.length ?? 0;
-        console.log(
-          `[HH API] <- ${response.status} GET /vacancies (${durationMs}ms), items=${itemsCount}`
-        );
-      }
+      const durationMs = Date.now() - startedAt;
+      const itemsCount = response.data.items?.length ?? 0;
+      devLog(
+        `[HH API] <- ${response.status} GET /vacancies (${durationMs}ms), items=${itemsCount}`
+      );
 
       for (const vacancy of response.data.items ?? []) {
         unique.set(vacancy.id, vacancy);
@@ -75,23 +70,19 @@ export async function fetchVacancyDetailsByUrl(
   const startedAt = Date.now();
   const normalizedUrl = new URL(detailedInformationUrl, "https://api.hh.ru").toString();
   try {
-    if (isDevelopment) {
-      console.log(`[HH API] -> GET vacancy details`, { url: normalizedUrl });
-    }
+    devLog(`[HH API] -> GET vacancy details`, { url: normalizedUrl });
 
     const response = await hhApi.get<Record<string, unknown>>(normalizedUrl);
-    if (isDevelopment) {
-      const durationMs = Date.now() - startedAt;
-      console.log(`[HH API] <- ${response.status} GET vacancy details (${durationMs}ms)`, {
-        url: normalizedUrl
-      });
-    }
+    const durationMs = Date.now() - startedAt;
+    devLog(`[HH API] <- ${response.status} GET vacancy details (${durationMs}ms)`, {
+      url: normalizedUrl
+    });
 
     return response.data;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown request error";
     const durationMs = Date.now() - startedAt;
-    console.warn(
+    devWarn(
       `[HH API] <- ERROR GET vacancy details (${durationMs}ms): ${message}`,
       normalizedUrl
     );

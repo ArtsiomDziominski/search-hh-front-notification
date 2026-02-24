@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import { loadSettings, importSettingsFromRaw } from "./config";
+import { devLog, devWarn } from "./devLogger";
 import { matchesKeywords } from "./filter";
 import { fetchVacanciesByQueries, fetchVacancyDetailsByUrl } from "./hhClient";
 import {
@@ -79,20 +80,20 @@ function extractKeySkills(details: Record<string, unknown>): string[] {
 
 async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
   const startedAt = Date.now();
-  console.log(`[runPollingCycle] started at ${new Date(startedAt).toISOString()}`);
+  devLog(`[runPollingCycle] started at ${new Date(startedAt).toISOString()}`);
   const settings = await loadSettings();
-  console.log(
+  devLog(
     `[runPollingCycle] settings loaded: queries=${settings.searchQueries.length}, pages=${settings.hh.pages}, perPage=${settings.hh.perPage}`
   );
   const allVacancies = await fetchVacanciesByQueries(settings);
-  console.log(`[runPollingCycle] fetched vacancies: total=${allVacancies.length}`);
+  devLog(`[runPollingCycle] fetched vacancies: total=${allVacancies.length}`);
   const sentIds = await getSentVacancyIds();
   const newVacancies = allVacancies.filter((vacancy) => !sentIds.has(vacancy.id));
-  console.log(
+  devLog(
     `[runPollingCycle] deduplicated vacancies: alreadySent=${sentIds.size}, new=${newVacancies.length}`
   );
   if (newVacancies.length === 0) {
-    console.log("No new vacancies found.");
+    devLog("No new vacancies found.");
     return;
   }
 
@@ -116,7 +117,7 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
           ? vacancy.detailed_information_url
           : vacancy.url;
       if (!detailedInformationUrl) {
-        console.warn(
+        devWarn(
           `[runPollingCycle] skip vacancy details fetch: id=${vacancy.id} has no detailed_information_url/url`
         );
         continue;
@@ -136,7 +137,7 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     }
 
     await addVacancyDetailRecords(detailRecords);
-    console.log(
+    devLog(
       `[runPollingCycle] vacancy details stored: requested=${vacanciesWithoutDetails.length}, saved=${detailRecords.length}`
     );
   }
@@ -153,23 +154,23 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
       detailsPayloadByVacancyId.get(vacancy.id) ?? null
     )
   );
-  console.log(
+  devLog(
     `[runPollingCycle] filtered vacancies (with key skills): matched=${filteredVacancies.length}, requiredKeywords=${settings.requiredKeywords.length}, excludedKeywords=${settings.excludedKeywords.length}`
   );
   if (filteredVacancies.length === 0) {
-    console.log("No new vacancies matched filters.");
+    devLog("No new vacancies matched filters.");
     return;
   }
 
   const subscribers = await getSubscribers();
-  console.log(`[runPollingCycle] subscribers loaded: count=${subscribers.length}`);
+  devLog(`[runPollingCycle] subscribers loaded: count=${subscribers.length}`);
   if (subscribers.length === 0) {
-    console.log("No subscribers, skipping notifications.");
+    devLog("No subscribers, skipping notifications.");
     return;
   }
 
   for (const [index, vacancy] of filteredVacancies.entries()) {
-    console.log(
+    devLog(
       `[runPollingCycle] sending ${index + 1}/${filteredVacancies.length}: id=${vacancy.id}, title="${vacancy.name}"`
     );
     const message = formatVacancyMessage(vacancy, keySkillsByVacancyId.get(vacancy.id) ?? []);
@@ -178,22 +179,22 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
 
   await addSentVacancyRecords(filteredVacancies, settings.sentVacancyHistoryLimit);
   const elapsedMs = Date.now() - startedAt;
-  console.log(
+  devLog(
     `Sent ${filteredVacancies.length} new vacancies to ${subscribers.length} subscribers (cycle=${elapsedMs}ms).`
   );
 }
 
 async function main(): Promise<void> {
-  console.log("Application startup: begin.");
+  devLog("Application startup: begin.");
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     throw new Error("TELEGRAM_BOT_TOKEN is missing. Add it to your environment.");
   }
 
   await initializeStateStore();
-  console.log("State store initialized.");
+  devLog("State store initialized.");
   const startupSettings = await loadSettings();
-  console.log(
+  devLog(
     `Startup settings loaded: pollIntervalMinutes=${startupSettings.pollIntervalMinutes}, sentVacancyHistoryLimit=${startupSettings.sentVacancyHistoryLimit}`
   );
 
@@ -210,10 +211,10 @@ async function main(): Promise<void> {
     }
   });
 
-  console.log("Starting Telegram bot...");
+  devLog("Starting Telegram bot...");
   void bot.start()
     .then(() => {
-      console.log("Telegram bot started.");
+      devLog("Telegram bot started.");
     })
     .catch((error) => {
       const message = error instanceof Error ? error.message : "Unknown bot startup error";
@@ -223,7 +224,7 @@ async function main(): Promise<void> {
   let isCycleRunning = false;
   const runCycleSafely = async (): Promise<void> => {
     if (isCycleRunning) {
-      console.log("Previous cycle is still running, skip current tick.");
+      devLog("Previous cycle is still running, skip current tick.");
       return;
     }
 
@@ -240,14 +241,14 @@ async function main(): Promise<void> {
 
   await runCycleSafely();
   const intervalMs = startupSettings.pollIntervalMinutes * 60 * 1000;
-  console.log(`Polling interval configured: ${intervalMs}ms.`);
+  devLog(`Polling interval configured: ${intervalMs}ms.`);
   setInterval(() => {
     void runCycleSafely();
   }, intervalMs);
 
   for (const signal of ["SIGINT", "SIGTERM"]) {
     process.once(signal, () => {
-      console.log(`Received ${signal}, stopping bot...`);
+      devLog(`Received ${signal}, stopping bot...`);
       void bot.stop(signal);
       process.exit(0);
     });

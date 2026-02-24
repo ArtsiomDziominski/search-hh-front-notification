@@ -8,7 +8,6 @@ function vacancySearchText(
   vacancy: HHVacancy,
   detailedVacancy: Record<string, unknown> | null = null
 ): string {
-  console.log(detailedVacancy);
   const keySkillsString = Array.isArray(detailedVacancy?.key_skills) ? detailedVacancy?.key_skills?.map((skill: { name: string }) => skill?.name || '').join(" ") : "";
   const parts = [
     vacancy.name,
