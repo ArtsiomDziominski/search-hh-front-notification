@@ -1,5 +1,5 @@
 {
-  "pollIntervalMinutes": 1,
+  "pollIntervalMinutes": 10,
   "searchQueries": [
     "Frontend-разработчик",
     "Frontend разработчик",
