@@ -394,6 +394,41 @@ export async function getVacancyKeySkillsByIds(vacancyIds: string[]): Promise<Ma
   return keySkillsByVacancyId;
 }
 
+export async function getVacancyDetailsPayloadByIds(
+  vacancyIds: string[]
+): Promise<Map<string, Record<string, unknown>>> {
+  if (vacancyIds.length === 0) {
+    return new Map<string, Record<string, unknown>>();
+  }
+
+  const db = getSentVacanciesDb();
+  const placeholders = vacancyIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+      SELECT vacancy_id, payload_json
+      FROM vacancy_details
+      WHERE vacancy_id IN (${placeholders})
+      `
+    )
+    .all(...vacancyIds) as Array<{ vacancy_id: string; payload_json: string }>;
+
+  const payloadByVacancyId = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.payload_json) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        continue;
+      }
+      payloadByVacancyId.set(row.vacancy_id, parsed as Record<string, unknown>);
+    } catch {
+      // Skip malformed payloads and continue with available records.
+    }
+  }
+
+  return payloadByVacancyId;
+}
+
 export async function addVacancyDetailRecords(records: VacancyDetailRecord[]): Promise<void> {
   if (records.length === 0) {
     return;

@@ -2,17 +2,18 @@
   "pollIntervalMinutes": 1,
   "searchQueries": [
     "Frontend-разработчик",
+    "Frontend разработчик",
     "Frontend developer",
     "Vue разработчик",
     "Nuxt разработчик",
+    "Vue",
+    "Nuxt",
     "JavaScript разработчик",
     "Middle Frontend разработчик"
   ],
   "requiredKeywords": [
-    "frontend",
     "vue",
     "nuxt",
-    "javascript",
     "typescript",
     "pinia"
   ],

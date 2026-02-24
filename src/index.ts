@@ -5,6 +5,7 @@ import { fetchVacanciesByQueries, fetchVacancyDetailsByUrl } from "./hhClient";
 import {
   addVacancyDetailRecords,
   addSentVacancyRecords,
+  getVacancyDetailsPayloadByIds,
   getVacancyKeySkillsByIds,
   getVacancyIdsWithoutDetails,
   getSentVacancyIds,
@@ -85,15 +86,8 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
   );
   const allVacancies = await fetchVacanciesByQueries(settings);
   console.log(`[runPollingCycle] fetched vacancies: total=${allVacancies.length}`);
-  const filteredVacancies = allVacancies.filter((vacancy) =>
-    matchesKeywords(vacancy, settings.requiredKeywords, settings.excludedKeywords)
-  );
-  console.log(
-    `[runPollingCycle] filtered vacancies: matched=${filteredVacancies.length}, requiredKeywords=${settings.requiredKeywords.length}, excludedKeywords=${settings.excludedKeywords.length}`
-  );
-
   const sentIds = await getSentVacancyIds();
-  const newVacancies = filteredVacancies.filter((vacancy) => !sentIds.has(vacancy.id));
+  const newVacancies = allVacancies.filter((vacancy) => !sentIds.has(vacancy.id));
   console.log(
     `[runPollingCycle] deduplicated vacancies: alreadySent=${sentIds.size}, new=${newVacancies.length}`
   );
@@ -147,6 +141,26 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     );
   }
 
+  const keySkillsByVacancyId = await getVacancyKeySkillsByIds(newVacancies.map((vacancy) => vacancy.id));
+  const detailsPayloadByVacancyId = await getVacancyDetailsPayloadByIds(
+    newVacancies.map((vacancy) => vacancy.id)
+  );
+  const filteredVacancies = newVacancies.filter((vacancy) =>
+    matchesKeywords(
+      vacancy,
+      settings.requiredKeywords,
+      settings.excludedKeywords,
+      detailsPayloadByVacancyId.get(vacancy.id) ?? null
+    )
+  );
+  console.log(
+    `[runPollingCycle] filtered vacancies (with key skills): matched=${filteredVacancies.length}, requiredKeywords=${settings.requiredKeywords.length}, excludedKeywords=${settings.excludedKeywords.length}`
+  );
+  if (filteredVacancies.length === 0) {
+    console.log("No new vacancies matched filters.");
+    return;
+  }
+
   const subscribers = await getSubscribers();
   console.log(`[runPollingCycle] subscribers loaded: count=${subscribers.length}`);
   if (subscribers.length === 0) {
@@ -154,20 +168,18 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     return;
   }
 
-  const keySkillsByVacancyId = await getVacancyKeySkillsByIds(newVacancies.map((vacancy) => vacancy.id));
-
-  for (const [index, vacancy] of newVacancies.entries()) {
+  for (const [index, vacancy] of filteredVacancies.entries()) {
     console.log(
-      `[runPollingCycle] sending ${index + 1}/${newVacancies.length}: id=${vacancy.id}, title="${vacancy.name}"`
+      `[runPollingCycle] sending ${index + 1}/${filteredVacancies.length}: id=${vacancy.id}, title="${vacancy.name}"`
     );
     const message = formatVacancyMessage(vacancy, keySkillsByVacancyId.get(vacancy.id) ?? []);
     await bot.sendToSubscribers(subscribers, message, settings.telegram.messageDelayMs);
   }
 
-  await addSentVacancyRecords(newVacancies, settings.sentVacancyHistoryLimit);
+  await addSentVacancyRecords(filteredVacancies, settings.sentVacancyHistoryLimit);
   const elapsedMs = Date.now() - startedAt;
   console.log(
-    `Sent ${newVacancies.length} new vacancies to ${subscribers.length} subscribers (cycle=${elapsedMs}ms).`
+    `Sent ${filteredVacancies.length} new vacancies to ${subscribers.length} subscribers (cycle=${elapsedMs}ms).`
   );
 }
 
