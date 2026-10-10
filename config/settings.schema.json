@@ -43,6 +43,9 @@
       "required": ["perPage", "pages", "onlyWithSalary"],
       "additionalProperties": false,
       "properties": {
+        "source": {
+          "enum": ["rss", "api"]
+        },
         "area": {
           "type": "string"
         },

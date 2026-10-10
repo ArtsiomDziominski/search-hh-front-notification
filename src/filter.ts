@@ -21,7 +21,11 @@ export function matchesKeywords(
   detailedVacancy: VacancyDetails | null = null
 ): boolean {
   const titleAndSkills = normalize([vacancy.name, ...extractKeySkills(detailedVacancy)].join(" "));
-  const fullText = `${titleAndSkills} ${normalize(extractDescription(detailedVacancy))}`;
+  // A vacancy from the RSS feed has no description, but HH found it by these queries,
+  // so their words do occur somewhere in its text.
+  const fullText = normalize(
+    [titleAndSkills, extractDescription(detailedVacancy), ...(vacancy.matchedQueries ?? [])].join(" ")
+  );
   const required = requiredKeywords.map(normalize).filter(Boolean);
   const excluded = excludedKeywords.map(normalize).filter(Boolean);
 

@@ -77,6 +77,7 @@ export class TelegramVacancyBot {
       `Поисковых фраз: <b>${settings.searchQueries.length}</b>`,
       `Ключевых слов (включить): <b>${settings.requiredKeywords.length}</b>`,
       `Ключевых слов (исключить): <b>${settings.excludedKeywords.length}</b>`,
+      `Источник вакансий: <b>${settings.hh.source === "api" ? "API HH" : "RSS-лента HH"}</b>`,
       `Поиск по всем HH: <b>${isAllHhSearch ? "да" : "нет"}</b>`,
       `Область поиска HH: <b>${hhSearchScope}</b>`,
       `Результатов на страницу: <b>${settings.hh.perPage}</b>`,
@@ -363,6 +364,10 @@ export class TelegramVacancyBot {
 
   async start(): Promise<void> {
     await this.bot.launch();
+  }
+
+  async getUsername(): Promise<string> {
+    return (await this.bot.telegram.getMe()).username;
   }
 
   /**

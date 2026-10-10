@@ -79,7 +79,7 @@ function describeVacancy(vacancy: HHVacancy, details: VacancyDetails | null): st
   const description = (extractDescription(details) || snippet).slice(0, maxDescriptionLength);
   const salary = vacancy.salary
     ? `${vacancy.salary.from ?? "—"} - ${vacancy.salary.to ?? "—"} ${vacancy.salary.currency ?? ""}`.trim()
-    : "";
+    : vacancy.salaryText ?? "";
 
   const fields: Array<[string, string]> = [
     ["Название", vacancy.name],
@@ -91,7 +91,8 @@ function describeVacancy(vacancy: HHVacancy, details: VacancyDetails | null): st
     ["Формат работы", extractNames(details, "work_format").join(", ")],
     ["Зарплата", salary],
     ["Ключевые навыки", extractKeySkills(details).join(", ")],
-    ["Описание", description]
+    ["Описание", description],
+    ["Найдена поиском HH по запросам", (vacancy.matchedQueries ?? []).join(", ")]
   ];
 
   return fields

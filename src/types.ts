@@ -4,6 +4,7 @@ export interface AppSettings {
   requiredKeywords: string[];
   excludedKeywords: string[];
   hh: {
+    source?: "rss" | "api";
     area?: string;
     perPage: number;
     pages: number;
@@ -43,6 +44,10 @@ export interface HHVacancy {
     currency?: string;
     gross?: boolean;
   } | null;
+  // Salary as a ready-made line; the only form the RSS feed provides.
+  salaryText?: string;
+  // Search queries whose results contained this vacancy.
+  matchedQueries?: string[];
   published_at?: string;
 }
 

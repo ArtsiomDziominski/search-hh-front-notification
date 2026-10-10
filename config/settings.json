@@ -23,6 +23,7 @@
     "ios"
   ],
   "hh": {
+    "source": "rss",
     "perPage": 50,
     "pages": 1,
     "onlyWithSalary": false

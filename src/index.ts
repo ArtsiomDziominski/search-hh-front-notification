@@ -24,7 +24,7 @@ dotenv.config();
 function formatSalary(vacancy: HHVacancy): string {
   const salary = vacancy.salary;
   if (!salary) {
-    return "Не указана";
+    return vacancy.salaryText ?? "Не указана";
   }
 
   const from = salary.from ?? "—";
@@ -162,10 +162,8 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
         typeof vacancy.detailed_information_url === "string" && vacancy.detailed_information_url.length > 0
           ? vacancy.detailed_information_url
           : vacancy.url;
+      // Vacancies from the RSS feed carry no API link, there is nothing to fetch for them.
       if (!detailedInformationUrl) {
-        devWarn(
-          `[runPollingCycle] skip vacancy details fetch: id=${vacancy.id} has no detailed_information_url/url`
-        );
         continue;
       }
 
@@ -271,6 +269,8 @@ async function main(): Promise<void> {
     // One cycle and exit, for schedulers (GitHub Actions, cron). Commands sent to the bot
     // since the previous run are answered first, so a fresh /start is already subscribed.
     try {
+      // The username shows which bot the token belongs to, i.e. where /start has to be sent.
+      devLog(`Telegram bot: @${await bot.getUsername()}.`);
       const handledUpdates = await bot.processPendingUpdates();
       devLog(`Pending Telegram updates handled: ${handledUpdates}.`);
     } catch (error) {
