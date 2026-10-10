@@ -47,6 +47,17 @@ jobs:
             echo "run_bot=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # HH closed its API to anonymous clients, so vacancies are read from the public RSS
+      # search feed. A blocked runner is worth a visible warning.
+      - name: Check HH feed availability
+        if: steps.plan.outputs.setup == 'true'
+        run: |
+          status=$(curl -s -o /dev/null -m 30 -w "%{http_code}" -A "search-hh-front-notification/1.0" "https://hh.ru/search/vacancy/rss?text=Vue" || true)
+          echo "HH RSS feed answered with HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::warning::HH RSS feed is not available from this runner (HTTP $status)."
+          fi
+
       - uses: actions/setup-node@v7
         if: steps.plan.outputs.setup == 'true'
         with:
