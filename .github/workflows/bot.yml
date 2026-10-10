@@ -1,0 +1,137 @@
+name: Bot
+
+on:
+  schedule:
+    # Twice an hour. GitHub often starts scheduled runs late, sometimes by tens of minutes.
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+  # A change to this file is checked right away: the environment is prepared
+  # (build, Ollama, model), but the bot itself is not started.
+  push:
+    paths:
+      - .github/workflows/bot.yml
+
+# One run at a time: each run starts from the state saved by the previous one.
+concurrency:
+  group: bot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      ADMIN_CHAT_IDS: ${{ secrets.ADMIN_CHAT_IDS }}
+      NODE_ENV: development
+      # The model runs on CPU here, so one answer can take minutes.
+      OLLAMA_TIMEOUT_MS: "600000"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Decide what to run
+        id: plan
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "setup=true" >> "$GITHUB_OUTPUT"
+            echo "run_bot=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "::warning::Secret TELEGRAM_BOT_TOKEN is not set, the bot was not started."
+            echo "setup=false" >> "$GITHUB_OUTPUT"
+            echo "run_bot=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "setup=true" >> "$GITHUB_OUTPUT"
+            echo "run_bot=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.plan.outputs.setup == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.plan.outputs.setup == 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.plan.outputs.setup == 'true'
+        run: npm run build
+
+      - name: Read Ollama settings
+        id: ollama
+        if: steps.plan.outputs.setup == 'true'
+        run: |
+          node -e "
+            const ollama = require('./config/settings.json').ollama;
+            const enabled = Boolean(ollama && ollama.enabled);
+            console.log('enabled=' + enabled);
+            console.log('model=' + (enabled ? ollama.model : ''));
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Restore Ollama model cache
+        id: model-cache
+        if: steps.ollama.outputs.enabled == 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ollama/models
+          key: ollama-model-${{ steps.ollama.outputs.model }}
+
+      - name: Start Ollama
+        if: steps.ollama.outputs.enabled == 'true'
+        env:
+          OLLAMA_MODEL: ${{ steps.ollama.outputs.model }}
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          # The installer starts a system service that keeps models elsewhere;
+          # run the server as the runner user so the cached ~/.ollama/models is used.
+          sudo systemctl stop ollama || true
+          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:11434/api/version > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          ollama pull "$OLLAMA_MODEL"
+
+      - name: Save Ollama model cache
+        if: steps.ollama.outputs.enabled == 'true' && steps.model-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ollama/models
+          key: ollama-model-${{ steps.ollama.outputs.model }}
+
+      # Subscribers and the history of sent vacancies live in data/, which is not in git.
+      # Cache entries are immutable, so every run saves a new one and the next run
+      # restores the most recent.
+      - name: Restore bot state
+        id: state
+        if: steps.plan.outputs.run_bot == 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: bot-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: bot-state-
+
+      - name: Warn about missing state
+        if: steps.plan.outputs.run_bot == 'true' && steps.state.outputs.cache-matched-key == ''
+        run: echo "::warning::No saved bot state found, starting with no subscribers and an empty history."
+
+      - name: Run one polling cycle
+        if: steps.plan.outputs.run_bot == 'true'
+        run: npm run start:once
+
+      - name: Save bot state
+        if: always() && steps.state.outcome == 'success' && hashFiles('data/**') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: data
+          key: bot-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Show Ollama log
+        if: failure() && steps.ollama.outputs.enabled == 'true'
+        run: tail -n 60 "$RUNNER_TEMP/ollama.log" || true

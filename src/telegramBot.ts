@@ -31,6 +31,12 @@ export class TelegramVacancyBot {
     this.bot = new Telegraf(options.token);
     this.getSettings = options.getSettings;
     this.onImportSettings = options.onImportSettings;
+    // Telegraf's default handler dumps the whole update (names, chat ids, text) to the log
+    // and stops processing; keep the log short and the bot alive instead.
+    this.bot.catch((error) => {
+      const message = error instanceof Error ? error.message : "Unknown update handling error";
+      console.error(`Telegram update handling failed: ${message}`);
+    });
     this.registerHandlers();
   }
 
@@ -78,10 +84,17 @@ export class TelegramVacancyBot {
       `Только с зарплатой: <b>${settings.hh.onlyWithSalary ? "да" : "нет"}</b>`,
       `Пауза между сообщениями: <b>${settings.telegram.messageDelayMs} мс</b>`,
       `Лимит истории отправленных вакансий: <b>${settings.sentVacancyHistoryLimit}</b>`,
+      `Проверка релевантности (Ollama): <b>${this.formatRelevanceCheckStatus(settings)}</b>`,
       `Админов для импорта: <b>${adminChatIds.length}</b>`
     ];
 
     return lines.join("\n");
+  }
+
+  private formatRelevanceCheckStatus(settings: AppSettings): string {
+    return settings.ollama?.enabled
+      ? `включена, модель ${this.escapeHtml(settings.ollama.model)}`
+      : "выключена";
   }
 
   private formatQueriesForUser(settings: AppSettings): string {
@@ -138,7 +151,12 @@ export class TelegramVacancyBot {
       `Область поиска HH: <b>${hhSearchScope}</b>`,
       `Только с зарплатой: <b>${settings.hh.onlyWithSalary ? "да" : "нет"}</b>`,
       `Результатов на страницу: <b>${settings.hh.perPage}</b>`,
-      `Страниц за цикл: <b>${settings.hh.pages}</b>`
+      `Страниц за цикл: <b>${settings.hh.pages}</b>`,
+      "",
+      `Проверка релевантности (Ollama): <b>${this.formatRelevanceCheckStatus(settings)}</b>`,
+      ...(settings.ollama?.enabled
+        ? [`Профиль для модели: ${this.escapeHtml(settings.ollama.profile)}`]
+        : [])
     ].join("\n");
   }
 
@@ -345,6 +363,29 @@ export class TelegramVacancyBot {
 
   async start(): Promise<void> {
     await this.bot.launch();
+  }
+
+  /**
+   * Handles the updates Telegram has queued since the last call and returns their count.
+   * Used instead of start() when the process runs one cycle and exits.
+   */
+  async processPendingUpdates(): Promise<number> {
+    let offset = 0;
+    let handled = 0;
+
+    for (;;) {
+      // Passing the offset past the last update also confirms the previous batch.
+      const updates = await this.bot.telegram.getUpdates(0, 100, offset, undefined);
+      if (updates.length === 0) {
+        return handled;
+      }
+
+      for (const update of updates) {
+        await this.bot.handleUpdate(update);
+        offset = update.update_id + 1;
+        handled += 1;
+      }
+    }
   }
 
   async sendToSubscribers(subscribers: number[], message: string, delayMs: number): Promise<void> {

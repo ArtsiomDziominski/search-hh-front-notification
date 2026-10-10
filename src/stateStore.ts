@@ -168,12 +168,26 @@ function initializeVacancyDetailsTable(db: Database.Database): void {
   `);
 }
 
+function initializeVacancyRelevanceTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vacancy_relevance (
+      vacancy_id TEXT PRIMARY KEY,
+      fingerprint TEXT NOT NULL,
+      relevant INTEGER NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      checked_at INTEGER NOT NULL,
+      checked_at_iso TEXT
+    );
+  `);
+}
+
 export async function initializeStateStore(): Promise<void> {
   await mkdir(dataDir, { recursive: true });
   await ensureFile(subscribersPath, "[]\n");
   const db = getSentVacanciesDb();
   initializeSentVacanciesTable(db);
   initializeVacancyDetailsTable(db);
+  initializeVacancyRelevanceTable(db);
 }
 
 export async function getSubscribers(): Promise<number[]> {
@@ -479,11 +493,64 @@ export async function addVacancyDetailRecords(records: VacancyDetailRecord[]): P
   upsertAll(records);
 }
 
+export async function getVacancyRelevanceByIds(
+  vacancyIds: string[],
+  fingerprint: string
+): Promise<Map<string, boolean>> {
+  if (vacancyIds.length === 0) {
+    return new Map<string, boolean>();
+  }
+
+  const db = getSentVacanciesDb();
+  const placeholders = vacancyIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+      SELECT vacancy_id, relevant
+      FROM vacancy_relevance
+      WHERE fingerprint = ? AND vacancy_id IN (${placeholders})
+      `
+    )
+    .all(fingerprint, ...vacancyIds) as Array<{ vacancy_id: string; relevant: number }>;
+
+  return new Map(rows.map((row) => [row.vacancy_id, row.relevant === 1]));
+}
+
+export async function saveVacancyRelevance(
+  vacancyId: string,
+  fingerprint: string,
+  relevant: boolean,
+  reason: string
+): Promise<void> {
+  const db = getSentVacanciesDb();
+  const checkedAt = Date.now();
+  db.prepare(
+    `
+    INSERT INTO vacancy_relevance (vacancy_id, fingerprint, relevant, reason, checked_at, checked_at_iso)
+    VALUES (@vacancy_id, @fingerprint, @relevant, @reason, @checked_at, @checked_at_iso)
+    ON CONFLICT(vacancy_id) DO UPDATE SET
+      fingerprint = excluded.fingerprint,
+      relevant = excluded.relevant,
+      reason = excluded.reason,
+      checked_at = excluded.checked_at,
+      checked_at_iso = excluded.checked_at_iso
+    `
+  ).run({
+    vacancy_id: vacancyId,
+    fingerprint,
+    relevant: relevant ? 1 : 0,
+    reason,
+    checked_at: checkedAt,
+    checked_at_iso: new Date(checkedAt).toISOString()
+  });
+}
+
 export async function clearSentVacancyRecords(): Promise<number> {
   const db = getSentVacanciesDb();
   const clearAll = db.transaction(() => {
     const sentResult = db.prepare("DELETE FROM sent_vacancies").run();
     const detailsResult = db.prepare("DELETE FROM vacancy_details").run();
+    db.prepare("DELETE FROM vacancy_relevance").run();
     return sentResult.changes + detailsResult.changes;
   });
 
