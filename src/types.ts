@@ -13,6 +13,11 @@ export interface AppSettings {
     messageDelayMs: number;
   };
   sentVacancyHistoryLimit: number;
+  ollama?: {
+    enabled: boolean;
+    model: string;
+    profile: string;
+  };
 }
 
 export interface HHVacancy {

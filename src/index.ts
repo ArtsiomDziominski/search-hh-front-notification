@@ -3,17 +3,21 @@ import { loadSettings, importSettingsFromRaw } from "./config";
 import { devLog, devWarn } from "./devLogger";
 import { matchesKeywords } from "./filter";
 import { fetchVacanciesByQueries, fetchVacancyDetailsByUrl } from "./hhClient";
+import { checkVacancyRelevance, OllamaSettings, relevanceFingerprint } from "./ollamaClient";
 import {
   addVacancyDetailRecords,
   addSentVacancyRecords,
   getVacancyDetailsPayloadByIds,
   getVacancyIdsWithoutDetails,
+  getVacancyRelevanceByIds,
   getSentVacancyIds,
   getSubscribers,
-  initializeStateStore
+  initializeStateStore,
+  saveVacancyRelevance
 } from "./stateStore";
 import { TelegramVacancyBot } from "./telegramBot";
 import { HHVacancy } from "./types";
+import { extractKeySkills, VacancyDetails } from "./vacancyText";
 
 dotenv.config();
 
@@ -77,21 +81,47 @@ function formatVacancyMessage(vacancy: HHVacancy, detailedVacancy: Record<string
   ].join("\n");
 }
 
-function extractKeySkills(details: Record<string, unknown>): string[] {
-  const rawKeySkills = details.key_skills;
-  if (!Array.isArray(rawKeySkills)) {
-    return [];
+async function selectRelevantVacancies(
+  vacancies: HHVacancy[],
+  detailsByVacancyId: Map<string, VacancyDetails>,
+  ollama: OllamaSettings
+): Promise<HHVacancy[]> {
+  const fingerprint = relevanceFingerprint(ollama);
+  const verdicts = await getVacancyRelevanceByIds(
+    vacancies.map((vacancy) => vacancy.id),
+    fingerprint
+  );
+
+  try {
+    for (const vacancy of vacancies) {
+      if (verdicts.has(vacancy.id)) {
+        continue;
+      }
+
+      const verdict = await checkVacancyRelevance(
+        vacancy,
+        detailsByVacancyId.get(vacancy.id) ?? null,
+        ollama
+      );
+      if (!verdict) {
+        devWarn(`[relevance] unparseable model answer, will retry: id=${vacancy.id}`);
+        continue;
+      }
+
+      await saveVacancyRelevance(vacancy.id, fingerprint, verdict.relevant, verdict.reason);
+      verdicts.set(vacancy.id, verdict.relevant);
+      devLog(
+        `[relevance] ${verdict.relevant ? "KEEP" : "SKIP"} id=${vacancy.id}, title="${vacancy.name}": ${verdict.reason}`
+      );
+    }
+  } catch (error) {
+    // Vacancies left without a verdict are neither sent nor marked as sent,
+    // so the next cycle picks them up again.
+    const message = error instanceof Error ? error.message : "Unknown relevance check error";
+    console.error(`Relevance check interrupted, unchecked vacancies will be retried: ${message}`);
   }
 
-  return rawKeySkills
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return null;
-      }
-      const maybeName = (entry as { name?: unknown }).name;
-      return typeof maybeName === "string" && maybeName.length > 0 ? maybeName : null;
-    })
-    .filter((skill): skill is string => skill !== null);
+  return vacancies.filter((vacancy) => verdicts.get(vacancy.id) === true);
 }
 
 async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
@@ -184,18 +214,29 @@ async function runPollingCycle(bot: TelegramVacancyBot): Promise<void> {
     return;
   }
 
-  for (const [index, vacancy] of filteredVacancies.entries()) {
+  const relevantVacancies = settings.ollama?.enabled
+    ? await selectRelevantVacancies(filteredVacancies, detailsPayloadByVacancyId, settings.ollama)
+    : filteredVacancies;
+  devLog(
+    `[runPollingCycle] relevance check: enabled=${settings.ollama?.enabled ?? false}, relevant=${relevantVacancies.length}/${filteredVacancies.length}`
+  );
+  if (relevantVacancies.length === 0) {
+    devLog("No new vacancies passed the relevance check.");
+    return;
+  }
+
+  for (const [index, vacancy] of relevantVacancies.entries()) {
     devLog(
-      `[runPollingCycle] sending ${index + 1}/${filteredVacancies.length}: id=${vacancy.id}, title="${vacancy.name}"`
+      `[runPollingCycle] sending ${index + 1}/${relevantVacancies.length}: id=${vacancy.id}, title="${vacancy.name}"`
     );
     const message = formatVacancyMessage(vacancy, detailsPayloadByVacancyId.get(vacancy.id) ?? null);
     await bot.sendToSubscribers(subscribers, message, settings.telegram.messageDelayMs);
   }
 
-  await addSentVacancyRecords(filteredVacancies, settings.sentVacancyHistoryLimit);
+  await addSentVacancyRecords(relevantVacancies, settings.sentVacancyHistoryLimit);
   const elapsedMs = Date.now() - startedAt;
   devLog(
-    `Sent ${filteredVacancies.length} new vacancies to ${subscribers.length} subscribers (cycle=${elapsedMs}ms).`
+    `Sent ${relevantVacancies.length} new vacancies to ${subscribers.length} subscribers (cycle=${elapsedMs}ms).`
   );
 }
 
@@ -225,6 +266,21 @@ async function main(): Promise<void> {
       return "JSON импортирован успешно.";
     }
   });
+
+  if (process.argv.includes("--once")) {
+    // One cycle and exit, for schedulers (GitHub Actions, cron). Commands sent to the bot
+    // since the previous run are answered first, so a fresh /start is already subscribed.
+    try {
+      const handledUpdates = await bot.processPendingUpdates();
+      devLog(`Pending Telegram updates handled: ${handledUpdates}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown getUpdates error";
+      console.error(`Failed to handle pending Telegram updates: ${message}`);
+    }
+
+    await runPollingCycle(bot);
+    return;
+  }
 
   devLog("Starting Telegram bot...");
   void bot.start()

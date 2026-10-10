@@ -14,11 +14,11 @@
   "requiredKeywords": [
     "vue",
     "nuxt",
-    "typescript",
     "pinia"
   ],
   "excludedKeywords": [
     "1c",
+    "1с",
     "android",
     "ios"
   ],
@@ -30,5 +30,10 @@
   "telegram": {
     "messageDelayMs": 300
   },
-  "sentVacancyHistoryLimit": 5000
+  "sentVacancyHistoryLimit": 5000,
+  "ollama": {
+    "enabled": true,
+    "model": "gemma3:4b",
+    "profile": "Ищу работу frontend-разработчиком на Vue.js / Nuxt. Подходят только вакансии frontend-разработчика, где Vue или Nuxt — основной фреймворк. Не подходят: fullstack- и backend-вакансии (PHP, Битрикс, Python, C#, Java, Go, 1С); вакансии, где основной фреймворк React, Angular или Svelte, а Vue только упомянут или идёт как «будет плюсом»; мобильная разработка; тестирование, аналитика, дизайн, менеджмент, преподавание."
+  }
 }
