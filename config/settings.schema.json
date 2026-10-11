@@ -49,6 +49,13 @@
         "area": {
           "type": "string"
         },
+        "workFormat": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["ON_SITE", "REMOTE", "HYBRID", "FIELD_WORK"]
+          }
+        },
         "perPage": {
           "type": "integer",
           "minimum": 1,

@@ -9,9 +9,13 @@ interface HHListResponse {
 
 const userAgent = "search-hh-front-notification/1.0";
 
+// HH expects repeated parameters (work_format=REMOTE&work_format=HYBRID), not work_format[]=...
+const paramsSerializer = { indexes: null };
+
 const hhApi = axios.create({
   baseURL: "https://api.hh.ru",
   timeout: 15000,
+  paramsSerializer,
   headers: {
     "User-Agent": userAgent
   }
@@ -20,6 +24,7 @@ const hhApi = axios.create({
 const hhSite = axios.create({
   baseURL: "https://hh.ru",
   timeout: 15000,
+  paramsSerializer,
   headers: {
     "User-Agent": userAgent
   }
@@ -41,6 +46,7 @@ async function fetchVacanciesFromApi(settings: AppSettings): Promise<HHVacancy[]
       const params = {
         text: query,
         area: settings.hh.area,
+        work_format: settings.hh.workFormat,
         per_page: settings.hh.perPage,
         page,
         only_with_salary: settings.hh.onlyWithSalary,
@@ -87,6 +93,7 @@ async function fetchVacanciesFromRss(settings: AppSettings): Promise<HHVacancy[]
     const params = {
       text: query,
       area: settings.hh.area,
+      work_format: settings.hh.workFormat,
       only_with_salary: settings.hh.onlyWithSalary ? true : undefined,
       order_by: "publication_time"
     };

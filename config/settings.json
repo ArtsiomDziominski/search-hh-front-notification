@@ -24,6 +24,7 @@
   ],
   "hh": {
     "source": "rss",
+    "workFormat": ["REMOTE"],
     "perPage": 50,
     "pages": 1,
     "onlyWithSalary": false

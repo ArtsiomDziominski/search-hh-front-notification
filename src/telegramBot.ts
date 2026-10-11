@@ -5,7 +5,14 @@ import {
   clearSentVacancyRecords,
   removeSubscriber
 } from "./stateStore";
-import { AppSettings } from "./types";
+import { AppSettings, HHWorkFormat } from "./types";
+
+const workFormatNames: Record<HHWorkFormat, string> = {
+  ON_SITE: "на месте работодателя",
+  REMOTE: "удалённо",
+  HYBRID: "гибрид",
+  FIELD_WORK: "разъездной"
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -80,6 +87,7 @@ export class TelegramVacancyBot {
       `Источник вакансий: <b>${settings.hh.source === "api" ? "API HH" : "RSS-лента HH"}</b>`,
       `Поиск по всем HH: <b>${isAllHhSearch ? "да" : "нет"}</b>`,
       `Область поиска HH: <b>${hhSearchScope}</b>`,
+      `Формат работы: <b>${this.formatWorkFormat(settings)}</b>`,
       `Результатов на страницу: <b>${settings.hh.perPage}</b>`,
       `Страниц за цикл: <b>${settings.hh.pages}</b>`,
       `Только с зарплатой: <b>${settings.hh.onlyWithSalary ? "да" : "нет"}</b>`,
@@ -90,6 +98,11 @@ export class TelegramVacancyBot {
     ];
 
     return lines.join("\n");
+  }
+
+  private formatWorkFormat(settings: AppSettings): string {
+    const formats = settings.hh.workFormat ?? [];
+    return formats.length ? formats.map((format) => workFormatNames[format]).join(", ") : "любой";
   }
 
   private formatRelevanceCheckStatus(settings: AppSettings): string {
@@ -150,6 +163,7 @@ export class TelegramVacancyBot {
       "",
       `Поиск по всем HH: <b>${isAllHhSearch ? "да" : "нет"}</b>`,
       `Область поиска HH: <b>${hhSearchScope}</b>`,
+      `Формат работы: <b>${this.formatWorkFormat(settings)}</b>`,
       `Только с зарплатой: <b>${settings.hh.onlyWithSalary ? "да" : "нет"}</b>`,
       `Результатов на страницу: <b>${settings.hh.perPage}</b>`,
       `Страниц за цикл: <b>${settings.hh.pages}</b>`,

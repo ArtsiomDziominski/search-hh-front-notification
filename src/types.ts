@@ -1,3 +1,5 @@
+export type HHWorkFormat = "ON_SITE" | "REMOTE" | "HYBRID" | "FIELD_WORK";
+
 export interface AppSettings {
   pollIntervalMinutes: number;
   searchQueries: string[];
@@ -6,6 +8,7 @@ export interface AppSettings {
   hh: {
     source?: "rss" | "api";
     area?: string;
+    workFormat?: HHWorkFormat[];
     perPage: number;
     pages: number;
     onlyWithSalary: boolean;
