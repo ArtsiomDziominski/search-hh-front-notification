@@ -1,15 +1,11 @@
 {
   "pollIntervalMinutes": 10,
   "searchQueries": [
-    "Frontend-разработчик",
-    "Frontend разработчик",
-    "Frontend developer",
-    "Vue разработчик",
-    "Nuxt разработчик",
     "Vue",
     "Nuxt",
-    "JavaScript разработчик",
-    "Middle Frontend разработчик"
+    "(Vue OR Nuxt) AND NAME:(frontend OR фронтенд OR front-end OR фронт)",
+    "NAME:(Vue OR Nuxt)",
+    "VueJS OR NuxtJS"
   ],
   "requiredKeywords": [
     "vue",

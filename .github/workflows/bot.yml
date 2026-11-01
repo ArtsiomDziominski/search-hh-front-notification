@@ -2,7 +2,7 @@ name: Bot
 
 on:
   schedule:
-    # Twice an hour. GitHub often starts scheduled runs late, sometimes by tens of minutes.
+    # Asks for two runs an hour, but GitHub has been starting only about 5 a day.
     - cron: "7,37 * * * *"
   workflow_dispatch:
   # A change to this file is checked right away: the environment is prepared
